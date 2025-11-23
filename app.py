@@ -11,7 +11,7 @@ st.set_page_config(
 )
 
 st.title("🩻 Asistente de Parámetros Radiológicos")
-st.write("Aplicación para seleccionar zona, proyección, tipo de paciente y habitus para obtener parámetros kV y mAs.")
+st.write("Selecciona los valores y obten tus factores !!.")
 
 # ------------------------------
 # CARGA DEL ARCHIVO EXCEL (desde GitHub/Cloud local)
