@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 # ------------------------------
 # CONFIGURACIÓN DE LA APP
@@ -11,66 +12,79 @@ st.set_page_config(
 )
 
 st.title("🩻 Asistente de Parámetros Radiológicos")
-st.write("Selecciona los valores y obten tus factores !!.")
+st.write("Selecciona los valores y obtén tus factores.")
 
 # ------------------------------
-# CARGA DEL ARCHIVO EXCEL (desde GitHub/Cloud local)
+# CARGA DEL ARCHIVO
 # ------------------------------
-EXCEL_PATH = "Base de datos.xlsx"  # Debe existir en el repo
+EXCEL_PATH = "Base de datos.xlsx"
 
 try:
     df = pd.read_excel(EXCEL_PATH)
 except Exception as e:
-    st.error(f"❌ No se pudo leer el archivo '{EXCEL_PATH}'. Verifica que esté en el repositorio.")
+    st.error(f"❌ No se pudo leer '{EXCEL_PATH}'. Verifica que esté en el repositorio.")
     st.stop()
 
-# ------------------------------
-# RENOMBRAR COLUMNAS PARA TRABAJAR CÓMODAMENTE
-# ------------------------------
-df = df.rename(columns={
-    "Zona de Estudio": "zona",
-    "Nombre de la Proyección": "proyeccion",
-    "Tipo de paciente": "tipo_paciente",
-    "kV Hipoesténico": "kv_hipo",
-    "mAs Hipoesténico": "mas_hipo",
-    "kV Normoesténico (Ref. Única)": "kv_normo",
-    "mAs Normoesténico (Ref. Única)": "mas_normo",
-    "kV Hiperesténico": "kv_hiper",
-    "mAs Hiperesténico": "mas_hiper"
-})
+# --------------------------------
+# NORMALIZACIÓN DE NOMBRES DE COLUMNAS
+# --------------------------------
+df.columns = (
+    df.columns
+    .str.strip()
+    .str.replace("á", "a", regex=False)
+    .str.replace("é", "e", regex=False)
+    .str.replace("í", "i", regex=False)
+    .str.replace("ó", "o", regex=False)
+    .str.replace("ú", "u", regex=False)
+    .str.replace(",", "", regex=False)  # elimina coma del nombre
+    .str.lower()
+)
 
-# Asegurar que las columnas categóricas sean texto
-df["zona"] = df["zona"].astype(str)
-df["proyeccion"] = df["proyeccion"].astype(str)
-df["tipo_paciente"] = df["tipo_paciente"].astype(str)
+rename_map = {
+    "zona de estudio": "zona",
+    "nombre de la proyeccion": "proyeccion",
+    "tipo de paciente": "tipo_paciente",
+    "kv hipoestenico": "kv_hipo",
+    "mas hipoestenico": "mas_hipo",
+    "kv normoestenico (ref unica)": "kv_normo",   # <-- nombre corregido
+    "mas normoestenico (ref unica)": "mas_normo",
+    "kv hiperestenico": "kv_hiper",
+    "mas hiperestenico": "mas_hiper"
+}
+
+df = df.rename(columns=rename_map)
+
+# ------------------------------
+# LIMPIEZA DE VALORES
+# ------------------------------
+for col in ["zona", "proyeccion", "tipo_paciente"]:
+    df[col] = df[col].astype(str).str.strip()
+
+# elimina valores NaN, vacíos o basura
+df = df[df["zona"].notna()]
+df = df[df["zona"].str.lower() != "nan"]
+df = df[df["zona"].str.lower() != "zona de estudio"]
+df = df[df["zona"].str.strip() != ""]
 
 # ------------------------------
 # SELECTORES
 # ------------------------------
 
 # ZONA
-zona = st.selectbox(
-    "1) Selecciona la zona de estudio:",
-    sorted(df["zona"].unique())
-)
+zona_lista = sorted(df["zona"].unique())
+zona = st.selectbox("1) Selecciona la zona de estudio:", zona_lista)
 
-# PROYECCIÓN (dependiente de zona)
+# PROYECCIÓN
 proyecciones_disp = df[df["zona"] == zona]["proyeccion"].unique()
-proyeccion = st.selectbox(
-    "2) Selecciona la proyección:",
-    sorted(proyecciones_disp)
-)
+proyeccion = st.selectbox("2) Selecciona la proyección:", sorted(proyecciones_disp))
 
-# TIPO DE PACIENTE (adulto/pediátrico)
+# TIPO DE PACIENTE
 paciente_disp = df[
     (df["zona"] == zona) &
     (df["proyeccion"] == proyeccion)
 ]["tipo_paciente"].unique()
 
-tipo_paciente = st.selectbox(
-    "3) Selecciona el tipo de paciente:",
-    sorted(paciente_disp)
-)
+tipo_paciente = st.selectbox("3) Selecciona el tipo de paciente:", sorted(paciente_disp))
 
 # HABITUS
 habitus = st.selectbox(
@@ -81,9 +95,8 @@ habitus = st.selectbox(
 st.markdown("---")
 
 # ------------------------------
-# FILTRO Y OBTENCIÓN DE PARÁMETROS
+# FILTRO
 # ------------------------------
-
 filtro = df[
     (df["zona"] == zona) &
     (df["proyeccion"] == proyeccion) &
@@ -91,33 +104,4 @@ filtro = df[
 ]
 
 if filtro.empty:
-    st.error("⚠ No existe una fila exacta con esa combinación en la base de datos.")
-    st.stop()
-
-fila = filtro.iloc[0]
-
-if habitus == "Hipoesténico":
-    kv = fila["kv_hipo"]
-    mas = fila["mas_hipo"]
-elif habitus == "Normoesténico":
-    kv = fila["kv_normo"]
-    mas = fila["mas_normo"]
-else:
-    kv = fila["kv_hiper"]
-    mas = fila["mas_hiper"]
-
-# ------------------------------
-# RESULTADOS VISUALES
-# ------------------------------
-st.subheader("📌 Parámetros recomendados según tu base de datos")
-
-col1, col2 = st.columns(2)
-
-col1.metric("kV", f"{kv}")
-col2.metric("mAs", f"{mas}")
-
-st.success("Parámetros cargados correctamente.")
-
-st.markdown("### 🔍 Fila utilizada para el cálculo")
-st.dataframe(filtro, use_container_width=True)
-
+    st.err
